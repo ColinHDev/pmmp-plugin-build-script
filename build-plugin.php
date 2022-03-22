@@ -6,14 +6,14 @@ if (ini_get("phar.readonly") === "1") {
 }
 
 $pharPath = getcwd() . DIRECTORY_SEPARATOR . basename(__DIR__) . ".phar";
-echo "[*] Creating output file $pharPath" . PHP_EOL;
+echo "Creating output file $pharPath" . PHP_EOL;
 
 if (file_exists($pharPath)) {
-    echo "[*] Phar file already exists, overwriting..." . PHP_EOL;
+    echo "Phar file already exists, overwriting..." . PHP_EOL;
     Phar::unlinkArchive($pharPath);
 }
 
-echo "[*] Adding files..." . PHP_EOL;
+echo "Adding files..." . PHP_EOL;
 
 $start = microtime(true);
 $phar = new Phar($pharPath);
@@ -35,11 +35,11 @@ $iterator = new \RecursiveIteratorIterator($directory);
 $regexIterator = new \RegexIterator($iterator, $regex);
 
 $count = count($phar->buildFromIterator($regexIterator, $dir));
-echo "[*] Added " . $count . " files" . PHP_EOL;
+echo "Added " . $count . " files" . PHP_EOL;
 
-echo "[*] Compressing files..." . PHP_EOL;
+echo "Compressing files..." . PHP_EOL;
 $phar->compressFiles(Phar::GZ);
-echo "[*] Finished compression" . PHP_EOL;
+echo "Finished compression" . PHP_EOL;
 $phar->stopBuffering();
 
 injectVirions();
@@ -53,11 +53,12 @@ function injectVirions() : void {
     $keepVirions = false;
     if (isset($argv[0])) {
         if (strtolower($argv[0]) === "--no-virions") {
-            echo "[*] Skipped virion injection" . PHP_EOL;
+            echo "Skipped virion injection" . PHP_EOL;
             return;
         }
         if (strtolower($argv[0]) === "--keep-virions") {
             $keepVirions = true;
+            echo "Virions will be kept and won't be deleted after they have been injected.";
         }
     }
 
@@ -66,18 +67,18 @@ function injectVirions() : void {
         return;
     }
     if (!function_exists("yaml_parse")) {
-        echo "[!] Skipped virion injection: YAML extension is required to inject virions into the phar" . PHP_EOL;
+        echo "[!] Skipping virion injection: YAML extension is required to inject virions into the phar" . PHP_EOL;
         return;
     }
     $data = yaml_parse(file_get_contents($manifest));
     if (!is_array($data) || !isset($data["projects"])) {
-        echo "[!] Skipped virion injection: Invalid .poggit.yml file" . PHP_EOL;
+        echo "[!] Skipping virion injection: Invalid .poggit.yml file" . PHP_EOL;
         return;
     }
     $projects = array_change_key_case($data["projects"], CASE_LOWER);
     $projectName = strtolower(basename(__DIR__));
     if (!isset($projects[$projectName])) {
-        echo "[!] Skipped virion injection: Project " . $projectName . " not found in .poggit.yml" . PHP_EOL;
+        echo "[!] Skipping virion injection: Project " . $projectName . " not found in .poggit.yml" . PHP_EOL;
         return;
     }
     $project = $projects[$projectName];
@@ -86,10 +87,10 @@ function injectVirions() : void {
     }
     $targetFolder = getcwd() . DIRECTORY_SEPARATOR . "virions";
     if (!is_dir($targetFolder)) {
-        echo "[*] Creating " . ($keepVirions ? "" : "temporary ") . "virion folder $targetFolder" . PHP_EOL;
         mkdir($targetFolder);
     }
     $targetFolder = rtrim($targetFolder, "\\/") . "/";
+    $injectedVirions = [];
     foreach ($project["libs"] as $n => $lib) {
         if (isset($lib["format"]) && $lib["format"] !== "virion") {
             echo "[!] Warning: Not processing library #$n because it is not in virion format:\n  ", str_replace("\n", "\n  ", yaml_emit($lib)) . PHP_EOL;
@@ -138,7 +139,6 @@ function injectVirions() : void {
             continue;
         }
         $tmpStream = mkstemp("virion_tmp_XXXXXX.phar", $tmpFile);
-        echo "[*] Downloading virion from " . $file . "..." . PHP_EOL;
         stream_copy_to_stream($url, $tmpStream);
         fclose($tmpStream);
         fclose($url);
@@ -146,24 +146,26 @@ function injectVirions() : void {
             $phar = new Phar($tmpFile);
             $virionYml = yaml_parse(file_get_contents((string) $phar["virion.yml"]));
             if(!is_array($virionYml) || !isset($virionYml["name"], $virionYml["version"])){
-                echo "[!] For library #$n, the phar file at $file is not a valid virion, skipping" . PHP_EOL;
+                echo "[!] Skipping virion injection: For library #$n, the phar file at $file is not a valid virion." . PHP_EOL;
                 continue;
             }
             $targetFile = $targetFolder . $virionYml["name"] . "_v" . strstr($virionYml["version"], ".", true) . ".phar";
             copy($tmpFile, $targetFile);
-            echo "[*] Successfully downloaded " . $virionYml["name"] . " virion phar. Injecting into " . basename(__DIR__) . " plugin phar..." . PHP_EOL;
             exec(PHP_BINARY . " " . $targetFile . " " . getcwd() . DIRECTORY_SEPARATOR . basename(__DIR__) . ".phar");
-            echo "[*] Successfully injected " . $virionYml["name"] . " virion into " . basename(__DIR__) . " plugin phar" . PHP_EOL;
+            $injectedVirions[] = $virionYml["name"];
             if (!$keepVirions) {
                 unlink($targetFile);
             }
         } catch (UnexpectedValueException $ex) {
-            echo "[!] A corrupted phar file was downloaded for library #$n ({$ex->getMessage()}), skipping\n";
+            echo "[!] Skipping virion injection: A corrupted phar file was downloaded for library #$n ({$ex->getMessage()})." . PHP_EOL;
         }
         unlink($tmpFile);
     }
     if (!$keepVirions) {
         rmdir($targetFolder);
+        echo "Successfully injected (and deleted) the following virions into " . basename(__DIR__) . ".phar: " . implode(", ", $injectedVirions) . PHP_EOL;
+    } else {
+        echo "Successfully injected the following virions into " . basename(__DIR__) . ".phar: " . implode(", ", $injectedVirions) . PHP_EOL;
     }
 }
 
