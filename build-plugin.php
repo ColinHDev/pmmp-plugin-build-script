@@ -108,7 +108,7 @@ function injectVirions() : void {
             }else{
                 $file = $manifest . "/../";
                 if($src[0] === "/"){
-                    if($projectPath = (trim($project["path"], "/") !== '')){
+                    if(($projectPath = trim($project["path"], "/")) !== ''){
                         $file .= $projectPath . "/";
                     }
                     $src = substr($src, 1);
