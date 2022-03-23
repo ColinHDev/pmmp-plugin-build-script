@@ -46,7 +46,7 @@ if (isset($argv[1])) {
     if (strtolower($argv[1]) === "--no-virions") {
         echo "Skipped virion injection" . PHP_EOL;
     } else if (strtolower($argv[1]) === "--keep-virions") {
-        echo "Virions will be kept and won't be deleted after they have been injected.";
+        echo "Virions will be kept and won't be deleted after they have been injected." . PHP_EOL;
         injectVirions(true);
     } else {
         injectVirions(false);
