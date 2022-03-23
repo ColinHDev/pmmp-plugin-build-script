@@ -42,26 +42,26 @@ $phar->compressFiles(Phar::GZ);
 echo "Finished compression" . PHP_EOL;
 $phar->stopBuffering();
 
-injectVirions();
+if (isset($argv[1])) {
+    if (strtolower($argv[1]) === "--no-virions") {
+        echo "Skipped virion injection" . PHP_EOL;
+    } else if (strtolower($argv[1]) === "--keep-virions") {
+        echo "Virions will be kept and won't be deleted after they have been injected.";
+        injectVirions(true);
+    } else {
+        injectVirions(false);
+    }
+} else {
+    injectVirions(false);
+}
+
 echo "Done in " . round(microtime(true) - $start, 3) . "s" . PHP_EOL;
 exit();
 
 /**
  * The code used in this function was copied and modified from https://github.com/poggit/devirion/blob/master/cli.php
  */
-function injectVirions() : void {
-    $keepVirions = false;
-    if (isset($argv[0])) {
-        if (strtolower($argv[0]) === "--no-virions") {
-            echo "Skipped virion injection" . PHP_EOL;
-            return;
-        }
-        if (strtolower($argv[0]) === "--keep-virions") {
-            $keepVirions = true;
-            echo "Virions will be kept and won't be deleted after they have been injected.";
-        }
-    }
-
+function injectVirions(bool $keepVirions) : void {
     $manifest = getcwd() . DIRECTORY_SEPARATOR . ".poggit.yml";
     if (!is_file($manifest)) {
         return;
