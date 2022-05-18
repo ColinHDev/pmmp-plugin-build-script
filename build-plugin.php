@@ -91,6 +91,7 @@ function injectVirions(bool $keepVirions) : void {
     }
     $targetFolder = rtrim($targetFolder, "\\/") . "/";
     $injectedVirions = [];
+    $deletedVirions = [];
     foreach ($project["libs"] as $n => $lib) {
         if (isset($lib["format"]) && $lib["format"] !== "virion") {
             echo "[!] Warning: Not processing library #$n because it is not in virion format:\n  ", str_replace("\n", "\n  ", yaml_emit($lib)) . PHP_EOL;
@@ -128,6 +129,13 @@ function injectVirions(bool $keepVirions) : void {
             $srcRepo = array_pop($srcParts) ?? $project->repo[1];
             $srcOwner = array_pop($srcParts) ?? $project->repo[0];
 
+            if (file_exists($targetFolder . $srcProject . ".phar")) {
+                echo "[!] Found existing virion phar for " . $srcProject . ". Using this file for injection. (Always make sure that that file is up to date!)"  . PHP_EOL;
+                exec(PHP_BINARY . " " . $targetFolder . $srcProject . ".phar" . " " . getcwd() . DIRECTORY_SEPARATOR . basename(__DIR__) . ".phar");
+                $injectedVirions[] = $srcProject;
+                continue;
+            }
+
             $version = $lib["version"] ?? "*";
             $branch = $libDeclaration["branch"] ?? ":default";
 
@@ -155,13 +163,14 @@ function injectVirions(bool $keepVirions) : void {
             $injectedVirions[] = $virionYml["name"];
             if (!$keepVirions) {
                 unlink($targetFile);
+                $deletedVirions[] = $virionYml["name"];
             }
         } catch (UnexpectedValueException $ex) {
             echo "[!] Skipping virion injection: A corrupted phar file was downloaded for library #$n ({$ex->getMessage()})." . PHP_EOL;
         }
         unlink($tmpFile);
     }
-    if (!$keepVirions) {
+    if (count($injectedVirions) === count($deletedVirions)) {
         rmdir($targetFolder);
         echo "Successfully injected (and deleted) the following virions into " . basename(__DIR__) . ".phar: " . implode(", ", $injectedVirions) . PHP_EOL;
     } else {
