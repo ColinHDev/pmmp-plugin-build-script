@@ -149,7 +149,7 @@ function injectVirions(bool $keepVirions) : void {
                 echo "[!] Skipping virion injection: For library #$n, the phar file at $file is not a valid virion." . PHP_EOL;
                 continue;
             }
-            $targetFile = $targetFolder . $virionYml["name"] . "_v" . strstr($virionYml["version"], ".", true) . ".phar";
+            $targetFile = $targetFolder . $virionYml["name"] . ".phar";
             copy($tmpFile, $targetFile);
             exec(PHP_BINARY . " " . $targetFile . " " . getcwd() . DIRECTORY_SEPARATOR . basename(__DIR__) . ".phar");
             $injectedVirions[] = $virionYml["name"];
