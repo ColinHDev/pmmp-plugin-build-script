@@ -50,7 +50,7 @@ if (is_file($composerFile)) {
     foreach ($injectableDependencies as $dependency => $directory) {
         $prefix = "_" . bin2hex(random_bytes(10)) . "_";
         $dependencyPrefixes[$dependency] = $prefix;
-        $src = "src" . DIRECTORY_SEPARATOR . str_replace("/", DIRECTORY_SEPARATOR, $dependency);
+        $src = "src" . DIRECTORY_SEPARATOR . str_replace(["/", "\\"], DIRECTORY_SEPARATOR, $dependency);
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS | FilesystemIterator::CURRENT_AS_PATHNAME)
         );
