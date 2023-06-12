@@ -34,6 +34,7 @@ if (is_file($composerFile)) {
     exec("composer install --no-progress --no-dev --prefer-dist --optimize-autoloader --ignore-platform-reqs");
 
     $vendorPath = __DIR__ . DIRECTORY_SEPARATOR . "vendor";
+    echo "Vendor path: $vendorPath -> " . is_dir($vendorPath) . PHP_EOL;
     $composerData = json_decode(file_get_contents($composerFile), true);
 
     $injectableDependencies = [];
@@ -91,6 +92,10 @@ function searchInjectableDependencies(string $dependency, string $vendorPath, ar
     $dependencyPath = $vendorPath . DIRECTORY_SEPARATOR . str_replace("/", DIRECTORY_SEPARATOR, $dependency);
     $composerFile = $dependencyPath . DIRECTORY_SEPARATOR . "composer.json";
     echo $dependency . PHP_EOL;
+    echo $dependencyPath . PHP_EOL;
+    echo $composerFile . PHP_EOL;
+    echo is_dir($dependencyPath) . PHP_EOL;
+    echo is_file($composerFile) . PHP_EOL;
     if (is_dir($dependencyPath) && is_file($composerFile)) {
         $composerData = json_decode(file_get_contents($composerFile), true);
         if (!isset($composerData["extra"]["virion"])) {
