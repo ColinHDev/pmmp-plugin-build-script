@@ -55,11 +55,13 @@ if (is_file($composerFile)) {
             new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS | FilesystemIterator::CURRENT_AS_PATHNAME)
         );
         foreach ($iterator as $file) {
+            var_dump($file);
             $srcPos = strpos($file, $src);
             if ($srcPos === false) {
                 continue;
             }
             $shadedFilePath = "src" . DIRECTORY_SEPARATOR . $prefix . substr($file, $srcPos + 4);
+            var_dump($shadedFilePath);
             $files[$shadedFilePath] = file_get_contents($file);
         }
     }
@@ -71,7 +73,7 @@ if (is_file($composerFile)) {
     }
     var_dump($dependencyPrefixes);
 }
-var_dump($files);
+var_dump(array_keys($files));
 
 $pharPath = __DIR__ . DIRECTORY_SEPARATOR . basename(__DIR__) . ".phar";
 if (file_exists($pharPath)) {
