@@ -44,8 +44,6 @@ if (is_file($composerFile)) {
         searchInjectableDependencies($dependency, $vendorPath, $injectableDependencies);
     }
 
-    var_dump($injectableDependencies);
-
     $dependencyPrefixes = [];
     foreach ($injectableDependencies as $dependency => $directory) {
         $prefix = "_" . bin2hex(random_bytes(10)) . "_";
@@ -55,13 +53,11 @@ if (is_file($composerFile)) {
             new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS | FilesystemIterator::CURRENT_AS_PATHNAME)
         );
         foreach ($iterator as $file) {
-            var_dump($file);
             $srcPos = strpos($file, $src);
             if ($srcPos === false) {
                 continue;
             }
             $shadedFilePath = "src" . DIRECTORY_SEPARATOR . $prefix . substr($file, $srcPos + 4);
-            var_dump($shadedFilePath);
             $files[$shadedFilePath] = file_get_contents($file);
         }
     }
@@ -71,9 +67,7 @@ if (is_file($composerFile)) {
             $files[$file] = shadeFile($contents, $dependency, $prefix);
         }
     }
-    var_dump($dependencyPrefixes);
 }
-var_dump(array_keys($files));
 
 $pharPath = __DIR__ . DIRECTORY_SEPARATOR . basename(__DIR__) . ".phar";
 if (file_exists($pharPath)) {
