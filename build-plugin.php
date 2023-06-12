@@ -90,6 +90,7 @@ exit();
 function searchInjectableDependencies(string $dependency, string $vendorPath, array &$injectableDependencies) : void {
     $dependencyPath = $vendorPath . DIRECTORY_SEPARATOR . str_replace("/", DIRECTORY_SEPARATOR, $dependency);
     $composerFile = $dependencyPath . DIRECTORY_SEPARATOR . "composer.json";
+    echo $dependency . PHP_EOL;
     if (is_dir($dependencyPath) && is_file($composerFile)) {
         $composerData = json_decode(file_get_contents($composerFile), true);
         if (!isset($composerData["extra"]["virion"])) {
