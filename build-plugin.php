@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 if (ini_get("phar.readonly") === "1") {
-    echo "[!] Set phar.readonly to 0 with -dphar.readonly=0" . PHP_EOL;
+    echo "Set phar.readonly to 0 with -dphar.readonly=0" . PHP_EOL;
     exit(1);
 }
 
+$start = microtime(true);
+
 /**
- * The following lines originated from https://github.com/pmmp/PocketMine-MP/blob/stable/build/server-phar.php
+ * @link https://github.com/pmmp/PocketMine-MP/blob/stable/build/server-phar.php
  */
 $dir = rtrim(str_replace("/", DIRECTORY_SEPARATOR, __DIR__ . DIRECTORY_SEPARATOR), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 $regex = sprintf('/^%s(%s).*/i',
@@ -18,35 +20,56 @@ $regex = sprintf('/^%s(%s).*/i',
     implode('|', array_map(static function(string $string) : string { return preg_quote($string, '/'); }, ["src", "resources", "plugin.yml", ".poggit.yml"]))
 );
 
-$start = microtime(true);
 $files = [];
-
-$directory = new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS | FilesystemIterator::CURRENT_AS_PATHNAME); //can't use fileinfo because of symlinks
-$iterator = new RecursiveIteratorIterator($directory);
-$regexIterator = new \RegexIterator($iterator, $regex);
-foreach($regexIterator as $file) {
+$iterator = new RegexIterator(
+    new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS | FilesystemIterator::CURRENT_AS_PATHNAME)),
+    $regex
+);
+foreach($iterator as $file) {
     $files[str_replace($dir, "", $file)] = file_get_contents($file);
 }
 
-exec("composer install --no-progress --no-dev --prefer-dist --optimize-autoloader --ignore-platform-reqs");
+$composerFile = __DIR__ . DIRECTORY_SEPARATOR . "composer.json";
+if (is_file($composerFile)) {
+    exec("composer install --no-progress --no-dev --prefer-dist --optimize-autoloader --ignore-platform-reqs");
 
-$vendorPath = __DIR__ . DIRECTORY_SEPARATOR . "vendor";
-$composerData = json_decode(file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . "composer.json"), true);
+    $vendorPath = __DIR__ . DIRECTORY_SEPARATOR . "vendor";
+    $composerData = json_decode(file_get_contents($composerFile), true);
 
-$injectableDependencies = [];
-
-foreach ($composerData["require"] ?? [] as $dependency => $version) {
-    if (isPlatformPackage($dependency)) {
-        continue;
+    $injectableDependencies = [];
+    foreach ($composerData["require"] ?? [] as $dependency => $version) {
+        if (isPlatformPackage($dependency)) {
+            continue;
+        }
+        searchInjectableDependencies($dependency, $vendorPath, $injectableDependencies);
     }
-    searchInjectableDependencies($dependency, $vendorPath, $injectableDependencies);
+
+    $dependencyPrefixes = [];
+    foreach ($injectableDependencies as $dependency => $directory) {
+        $prefix = "_" . bin2hex(random_bytes(10)) . "_";
+        $dependencyPrefixes[$dependency] = $prefix;
+        $src = "src" . DIRECTORY_SEPARATOR . str_replace("/", DIRECTORY_SEPARATOR, $dependency);
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS | FilesystemIterator::CURRENT_AS_PATHNAME)
+        );
+        foreach ($iterator as $file) {
+            $srcPos = strpos($file, $src);
+            if ($srcPos === false) {
+                continue;
+            }
+            $shadedFilePath = "src" . DIRECTORY_SEPARATOR . $prefix . substr($file, $srcPos + 4);
+            $files[$shadedFilePath] = file_get_contents($file);
+        }
+    }
+
+    foreach ($dependencyPrefixes as $dependency => $prefix) {
+        foreach ($files as $file => $contents) {
+            $files[$file] = shadeFile($contents, $dependency, $prefix);
+        }
+    }
 }
 
-foreach ($injectableDependencies as $dependency => $directory) {
-    injectDependency($files, $dependency, $directory);
-}
-
-$pharPath = getcwd() . DIRECTORY_SEPARATOR . basename(__DIR__) . ".phar";
+$pharPath = __DIR__ . DIRECTORY_SEPARATOR . basename(__DIR__) . ".phar";
 if (file_exists($pharPath)) {
     Phar::unlinkArchive($pharPath);
 }
@@ -80,11 +103,6 @@ function searchInjectableDependencies(string $dependency, string $vendorPath, ar
         if (version_compare($specVersion, "3.0", ">") || version_compare($specVersion, "3.0", "<") || !isset($virionData["namespace-root"])) {
             return;
         }
-        // If the dependency is already in the list, this means another library depends on it.
-        // Because of that, we want it add the end of the list, so it gets shaded after all dependencies that depend on it are added.
-        if (isset($injectableDependencies[$virionData["namespace-root"]])) {
-            unset($injectableDependencies[$virionData["namespace-root"]]);
-        }
         $injectableDependencies[$virionData["namespace-root"]] = $dependencyPath;
         foreach($composerData["require"] ?? [] as $subdependency => $version) {
             if (isPlatformPackage($subdependency)) {
@@ -92,27 +110,6 @@ function searchInjectableDependencies(string $dependency, string $vendorPath, ar
             }
             searchInjectableDependencies($subdependency, $vendorPath, $injectableDependencies);
         }
-    }
-}
-
-function injectDependency(array &$files, string $dependency, string $directory) : void {
-    $prefix = "_" . bin2hex(random_bytes(10)) . "_";
-    // Shading all existing files in the phar
-    foreach ($files as $file => $contents) {
-        $files[$file] = shadeFile($contents, $dependency, $prefix);
-    }
-    $src = "src" . DIRECTORY_SEPARATOR . str_replace("/", DIRECTORY_SEPARATOR, $dependency);
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS | FilesystemIterator::CURRENT_AS_PATHNAME)
-    );
-    // Shading all of the dependency's files
-    foreach ($iterator as $file) {
-        $srcPos = strpos($file, $src);
-        if ($srcPos === false) {
-            continue;
-        }
-        $shadedFilePath = "src" . DIRECTORY_SEPARATOR . $prefix . substr($file, $srcPos + 4);
-        $files[$shadedFilePath] = shadeFile(file_get_contents($file), $dependency, $prefix);
     }
 }
 
