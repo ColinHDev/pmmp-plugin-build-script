@@ -31,9 +31,11 @@ foreach($iterator as $file) {
 
 $composerFile = __DIR__ . DIRECTORY_SEPARATOR . "composer.json";
 if (is_file($composerFile)) {
-    exec("composer install --no-progress --no-dev --prefer-dist --optimize-autoloader --ignore-platform-reqs");
-
     $vendorPath = __DIR__ . DIRECTORY_SEPARATOR . "vendor";
+    if (is_dir($vendorPath)) {
+        exec("composer install --no-progress --no-dev --prefer-dist --optimize-autoloader --ignore-platform-reqs");
+    }
+    
     $composerData = json_decode(file_get_contents($composerFile), true);
 
     $injectableDependencies = [];
