@@ -32,7 +32,7 @@ foreach($iterator as $file) {
 $composerFile = __DIR__ . DIRECTORY_SEPARATOR . "composer.json";
 if (is_file($composerFile)) {
     $vendorPath = __DIR__ . DIRECTORY_SEPARATOR . "vendor";
-    if (is_dir($vendorPath)) {
+    if (!is_dir($vendorPath)) {
         exec("composer install --no-progress --no-dev --prefer-dist --optimize-autoloader --ignore-platform-reqs");
     }
     
